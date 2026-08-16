@@ -9,7 +9,6 @@ TWEAK_NAME := BarcodeSafari
 BarcodeSafari_FILES := Tweak.xm
 BarcodeSafari_CFLAGS := -fobjc-arc
 BarcodeSafari_FRAMEWORKS := UIKit
-BarcodeSafari_PRIVATE_FRAMEWORKS := ControlCenterUIKit
 BarcodeSafari_INSTALL_TARGET_PROCESSES := ControlCenter
 
 include $(THEOS_MAKE_PATH)/tweak.mk
