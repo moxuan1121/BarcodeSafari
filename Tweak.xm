@@ -1,7 +1,32 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <fcntl.h>
 #import <stdlib.h>
+#import <string.h>
+#import <unistd.h>
+
+static void BarcodeSafariWriteEarlyLoad(void)
+{
+    const char *paths[] = {
+        "/tmp/BarcodeSafari-early.log",
+        "/var/mobile/Documents/BarcodeSafari-Debug.log"
+    };
+    const char *line = "[LOAD] C constructor executed\n";
+    for (size_t index = 0; index < sizeof(paths) / sizeof(paths[0]); index++) {
+        int descriptor = open(paths[index], O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (descriptor >= 0) {
+            write(descriptor, line, strlen(line));
+            close(descriptor);
+        }
+    }
+}
+
+__attribute__((constructor))
+static void BarcodeSafariEarlyConstructor(void)
+{
+    BarcodeSafariWriteEarlyLoad();
+}
 
 static NSString *const BarcodeSafariDebugPath = @"/var/mobile/Documents/BarcodeSafari-Debug.log";
 
