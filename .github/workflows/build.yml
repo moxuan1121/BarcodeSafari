@@ -1,0 +1,38 @@
+name: Build RootHide deb
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-roothide:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install RootHide Theos
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang make perl git wget xz-utils
+          git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
+          git -C "$HOME/theos" fetch --all --tags
+          git -C "$HOME/theos" checkout roothide
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Build RootHide package
+        env:
+          THEOS_PACKAGE_SCHEME: roothide
+        run: |
+          make clean
+          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=roothide
+          test -n "$(find packages -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          dpkg-deb --info packages/*.deb
+
+      - name: Upload RootHide deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: barcode-safari-roothide-deb
+          path: packages/*.deb
+          if-no-files-found: error

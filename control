@@ -1,0 +1,10 @@
+Package: com.moxuan.barcodesafari
+Name: BarcodeSafari
+Version: 1.0.0
+Architecture: iphoneos-arm64e
+Description: Open web QR codes from Control Center Scanner in Safari
+Maintainer: Moxuan
+Author: Moxuan
+Section: Tweaks
+Depends: mobilesubstrate
+Installed-Size: 64
