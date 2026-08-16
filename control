@@ -1,6 +1,6 @@
 Package: com.moxuan.barcodesafari
 Name: BarcodeSafari
-Version: 1.0.0
+Version: 1.0.1
 Architecture: iphoneos-arm64e
 Description: Open web QR codes from Control Center Scanner in Safari
 Maintainer: Moxuan
