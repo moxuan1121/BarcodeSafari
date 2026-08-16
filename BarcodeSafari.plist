@@ -2,13 +2,17 @@
     Filter = {
         Bundles = (
             "com.apple.BarcodeScanner",
+            "com.apple.codescanner",
             "com.apple.ControlCenter",
-            "com.apple.springboard"
+            "com.apple.springboard",
+            "com.apple.camera"
         );
         Executables = (
             "BarcodeScanner",
+            "CodeScanner",
             "ControlCenter",
-            "SpringBoard"
+            "SpringBoard",
+            "Camera"
         );
     };
 }

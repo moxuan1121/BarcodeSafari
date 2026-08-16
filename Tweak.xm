@@ -1,6 +1,5 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import <objc/runtime.h>
 #import <mach-o/dyld.h>
 #import <fcntl.h>
 #import <stdlib.h>
@@ -48,6 +47,8 @@ static NSString *const BarcodeSafariDebugPaths[] = {
     @"/var/jb/tmp/BarcodeSafari-Debug.log"
 };
 
+static NSString *const BarcodeSafariProcessProbePath = @"/var/jb/tmp/BarcodeSafari-ProcessProbe.log";
+
 static void BarcodeSafariLog(NSString *tag, NSString *message)
 {
     NSString *timestamp = [[NSDate date] descriptionWithLocale:nil];
@@ -76,6 +77,9 @@ static void BarcodeSafariLog(NSString *tag, NSString *message)
 
 static BOOL BarcodeSafariContainsKeyword(NSString *value, NSArray<NSString *> *keywords)
 {
+    if (value == nil) {
+        return NO;
+    }
     for (NSString *keyword in keywords) {
         if ([value rangeOfString:keyword options:NSCaseInsensitiveSearch].location != NSNotFound) {
             return YES;
@@ -84,31 +88,23 @@ static BOOL BarcodeSafariContainsKeyword(NSString *value, NSArray<NSString *> *k
     return NO;
 }
 
-static void BarcodeSafariProbeRuntimeDetails(void);
-
-static void BarcodeSafariLogMethods(Class candidateClass, NSArray<NSString *> *methodKeywords)
+static void BarcodeSafariAppendProcessProbe(NSString *line)
 {
-    NSMutableSet<NSString *> *seen = [NSMutableSet set];
-    for (Class currentClass = candidateClass; currentClass != Nil; currentClass = class_getSuperclass(currentClass)) {
-        NSString *className = NSStringFromClass(currentClass);
-        unsigned int methodCount = 0;
-        Method *methods = class_copyMethodList(currentClass, &methodCount);
-        NSUInteger loggedMethodCount = 0;
-        for (unsigned int index = 0; index < methodCount && loggedMethodCount < 40; index++) {
-            SEL selector = method_getName(methods[index]);
-            NSString *selectorName = NSStringFromSelector(selector);
-            if ([seen containsObject:selectorName] || !BarcodeSafariContainsKeyword(selectorName, methodKeywords)) {
-                continue;
-            }
-            [seen addObject:selectorName];
-            const char *encoding = method_getTypeEncoding(methods[index]);
-            BarcodeSafariLog(@"METHOD", [NSString stringWithFormat:@"%@ -> %@ encoding=%s",
-                                                       className,
-                                                       selectorName,
-                                                       encoding ?: "<nil>"]);
-            loggedMethodCount++;
-        }
-        free(methods);
+    NSString *directory = [BarcodeSafariProcessProbePath stringByDeletingLastPathComponent];
+    [[NSFileManager defaultManager] createDirectoryAtPath:directory
+                               withIntermediateDirectories:YES
+                                                attributes:nil
+                                                     error:nil];
+    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:BarcodeSafariProcessProbePath];
+    if (handle == nil) {
+        [[NSFileManager defaultManager] createFileAtPath:BarcodeSafariProcessProbePath contents:nil attributes:nil];
+        handle = [NSFileHandle fileHandleForWritingAtPath:BarcodeSafariProcessProbePath];
+    }
+    if (handle != nil) {
+        [handle seekToEndOfFile];
+        NSData *data = [[line stringByAppendingString:@"\n"] dataUsingEncoding:NSUTF8StringEncoding];
+        [handle writeData:data];
+        [handle closeFile];
     }
 }
 
@@ -118,50 +114,38 @@ static void BarcodeSafariProbeRuntime(void)
     NSString *processName = processInfo.processName ?: @"<nil>";
     NSString *bundleID = NSBundle.mainBundle.bundleIdentifier ?: @"<nil>";
     NSString *executablePath = NSBundle.mainBundle.executablePath ?: @"<nil>";
-    BarcodeSafariLog(@"LOAD", [NSString stringWithFormat:@"tweak loaded processName=%@ bundleIdentifier=%@ pid=%d executablePath=%@",
+    BarcodeSafariLog(@"LOAD", [NSString stringWithFormat:@"probe processName=%@ bundleIdentifier=%@ pid=%d executablePath=%@",
                                                      processName,
                                                      bundleID,
                                                      processInfo.processIdentifier,
                                                      executablePath]);
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        BarcodeSafariLog(@"LOAD", @"starting delayed runtime enumeration");
-        BarcodeSafariProbeRuntimeDetails();
-    });
-}
-
-static void BarcodeSafariProbeRuntimeDetails(void)
-{
-    Class legacyClass = NSClassFromString(@"CCUIQRCodeScannerViewController");
-    SEL legacySelector = sel_registerName("qrCodeScanner:didDecodeString:");
-    BOOL legacySelectorExists = legacyClass != Nil && [legacyClass instancesRespondToSelector:legacySelector];
-
-    BarcodeSafariLog(@"CLASS", [NSString stringWithFormat:@"CCUIQRCodeScannerViewController = %@",
-                                                      legacyClass == Nil ? @"NO" : @"YES"]);
-    BarcodeSafariLog(@"METHOD", [NSString stringWithFormat:@"qrCodeScanner:didDecodeString: = %@",
-                                                       legacySelectorExists ? @"YES" : @"NO"]);
-
-    NSArray<NSString *> *classKeywords = @[@"Barcode", @"QRCode", @"QR", @"Scanner", @"CodeScanner", @"Payload", @"Result", @"Preview", @"Web"];
-    NSArray<NSString *> *methodKeywords = @[@"scan", @"code", @"decode", @"result", @"payload", @"URL", @"url", @"open", @"preview", @"web", @"request", @"present"];
-    int classCount = objc_getClassList(NULL, 0);
-    Class *classes = classCount > 0 ? (__unsafe_unretained Class *)calloc((size_t)classCount, sizeof(Class)) : NULL;
-    if (classes == NULL) {
-        BarcodeSafariLog(@"CLASS", @"objc_getClassList returned no classes");
-        return;
+    NSArray<NSString *> *interestingKeywords = @[@"SpringBoard", @"ControlCenter", @"Barcode", @"Scanner", @"CodeScanner", @"Camera", @"QR"];
+    BOOL interesting = BarcodeSafariContainsKeyword(processName, interestingKeywords) ||
+                       BarcodeSafariContainsKeyword(bundleID, interestingKeywords) ||
+                       BarcodeSafariContainsKeyword(executablePath, interestingKeywords);
+    if (interesting) {
+        NSString *line = [NSString stringWithFormat:@"%@ pid=%d process=%@ bundle=%@ executable=%@",
+                          [[NSDate date] descriptionWithLocale:nil],
+                          processInfo.processIdentifier,
+                          processName,
+                          bundleID,
+                          executablePath];
+        BarcodeSafariAppendProcessProbe(line);
     }
 
-    objc_getClassList(classes, classCount);
-    NSUInteger loggedClassCount = 0;
-    for (int index = 0; index < classCount && loggedClassCount < 100; index++) {
-        NSString *className = NSStringFromClass(classes[index]);
-        if (!BarcodeSafariContainsKeyword(className, classKeywords)) {
-            continue;
+    NSArray<NSString *> *legacyClasses = @[
+        @"CCUIQRCodeScannerViewController",
+        @"CSMainViewController",
+        @"BCSActionManager",
+        @"SFCameraScannerViewController"
+    ];
+    for (NSString *name in legacyClasses) {
+        Class cls = NSClassFromString(name);
+        if (cls != Nil) {
+            BarcodeSafariLog(@"CLASS", [NSString stringWithFormat:@"%@ = YES", name]);
         }
-        BarcodeSafariLog(@"CLASS", className);
-        BarcodeSafariLogMethods(classes[index], methodKeywords);
-        loggedClassCount++;
     }
-    free(classes);
 }
 
 %ctor
