@@ -1,0 +1,42 @@
+name: Build BarcodeSafari RootHide package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main, mox1]
+
+jobs:
+  build-roothide:
+    name: Build RootHide
+    runs-on: macos-14
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: brew install ldid make xz
+
+      - name: Install RootHide Theos and SDK
+        run: |
+          git clone --recursive https://github.com/roothide/theos.git "$HOME/theos-roothide"
+          mkdir -p "$HOME/theos-roothide/sdks"
+          curl -fL \
+            https://github.com/theos/sdks/releases/latest/download/iPhoneOS16.5.sdk.tar.xz \
+            -o "$RUNNER_TEMP/iPhoneOS16.5.sdk.tar.xz"
+          tar -xJf "$RUNNER_TEMP/iPhoneOS16.5.sdk.tar.xz" \
+            -C "$HOME/theos-roothide/sdks"
+
+      - name: Build RootHide package
+        run: |
+          export THEOS="$HOME/theos-roothide"
+          export THEOS_PACKAGE_SCHEME=roothide
+          gmake clean
+          gmake package FINALPACKAGE=1
+
+      - name: Upload RootHide package
+        uses: actions/upload-artifact@v4
+        with:
+          name: BarcodeSafari-RootHide
+          path: packages/*.deb
+          if-no-files-found: error
