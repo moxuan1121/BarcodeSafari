@@ -17,11 +17,7 @@ static void BarcodeSafariOpenURL(NSString *value)
     NSURL *url = [NSURL URLWithString:value];
     dispatch_async(dispatch_get_main_queue(), ^{
         UIApplication *application = UIApplication.sharedApplication;
-        if ([application respondsToSelector:@selector(openURL:options:completionHandler:)]) {
-            [application openURL:url options:@{} completionHandler:nil];
-        } else {
-            [application openURL:url];
-        }
+        [application openURL:url options:@{} completionHandler:nil];
     });
 }
 
