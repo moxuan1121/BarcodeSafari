@@ -4,5 +4,8 @@
             "com.apple.controlcenter",
             "com.apple.BarcodeScanner"
         );
+        Executables = (
+            "BarcodeScanner"
+        );
     };
 }
