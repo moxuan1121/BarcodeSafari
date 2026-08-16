@@ -16,9 +16,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang make perl git wget xz-utils
-          git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
-          git -C "$HOME/theos" fetch --all --tags
-          git -C "$HOME/theos" checkout roothide
+          git clone --recursive https://github.com/roothide/theos.git "$HOME/theos"
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
 
       - name: Build RootHide package
