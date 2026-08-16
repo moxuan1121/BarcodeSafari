@@ -1,7 +1,8 @@
 {
     Filter = {
         Bundles = (
-            "com.apple.controlcenter"
+            "com.apple.controlcenter",
+            "com.apple.BarcodeScanner"
         );
     };
 }

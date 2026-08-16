@@ -3,20 +3,25 @@
 #import <stdlib.h>
 #import <string.h>
 
-static NSString *const BarcodeSafariLogPath = @"/var/mobile/BarcodeSafari-loaded.txt";
+static NSArray<NSString *> *BarcodeSafariLogPaths(void)
+{
+    return @[@"/var/mobile/BarcodeSafari-loaded.txt", @"/tmp/BarcodeSafari-loaded.txt"];
+}
 
 static void BarcodeSafariLog(NSString *message)
 {
     NSString *line = [message stringByAppendingString:@"\n"];
     NSData *data = [line dataUsingEncoding:NSUTF8StringEncoding];
-    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:BarcodeSafariLogPath];
-    if (handle == nil) {
-        [[NSFileManager defaultManager] createFileAtPath:BarcodeSafariLogPath contents:nil attributes:nil];
-        handle = [NSFileHandle fileHandleForWritingAtPath:BarcodeSafariLogPath];
+    for (NSString *path in BarcodeSafariLogPaths()) {
+        NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:path];
+        if (handle == nil) {
+            [[NSFileManager defaultManager] createFileAtPath:path contents:nil attributes:nil];
+            handle = [NSFileHandle fileHandleForWritingAtPath:path];
+        }
+        [handle seekToEndOfFile];
+        [handle writeData:data];
+        [handle closeFile];
     }
-    [handle seekToEndOfFile];
-    [handle writeData:data];
-    [handle closeFile];
     NSLog(@"[BarcodeSafari] %@", message);
 }
 
