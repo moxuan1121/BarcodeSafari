@@ -15,7 +15,7 @@ jobs:
       - name: Install RootHide Theos
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang make perl git wget xz-utils
+          sudo apt-get install -y clang make perl git wget xz-utils fakeroot rsync
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/roothide/theos.git "$HOME/theos"
           git clone --depth 1 https://github.com/theos/sdks.git "$RUNNER_TEMP/sdks"
           cp -R "$RUNNER_TEMP/sdks/iPhoneOS15.6.sdk" "$HOME/theos/sdks/"
