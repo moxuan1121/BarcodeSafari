@@ -26,7 +26,7 @@ jobs:
         env:
           THEOS_PACKAGE_SCHEME: roothide
         run: |
-          command -v dm.pl
+          test -f "$THEOS/vendor/dm.pl/dm.pl"
           command -v fakeroot
           test -d "$THEOS/sdks/iPhoneOS15.6.sdk"
           make --version | head -n 1
