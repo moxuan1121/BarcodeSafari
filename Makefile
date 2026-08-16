@@ -9,6 +9,6 @@ TWEAK_NAME := BarcodeSafari
 BarcodeSafari_FILES := Tweak.xm
 BarcodeSafari_CFLAGS := -fobjc-arc
 BarcodeSafari_FRAMEWORKS := UIKit
-BarcodeSafari_INSTALL_TARGET_PROCESSES := ControlCenter
+BarcodeSafari_INSTALL_TARGET_PROCESSES := ControlCenter BarcodeScanner SpringBoard
 
 include $(THEOS_MAKE_PATH)/tweak.mk

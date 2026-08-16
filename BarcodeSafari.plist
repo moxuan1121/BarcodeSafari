@@ -1,7 +1,14 @@
 {
     Filter = {
+        Bundles = (
+            "com.apple.BarcodeScanner",
+            "com.apple.ControlCenter",
+            "com.apple.springboard"
+        );
         Executables = (
-            "BarcodeScanner"
+            "BarcodeScanner",
+            "ControlCenter",
+            "SpringBoard"
         );
     };
 }

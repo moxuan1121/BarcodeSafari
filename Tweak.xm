@@ -1,20 +1,34 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <mach-o/dyld.h>
 #import <fcntl.h>
 #import <stdlib.h>
 #import <string.h>
 #import <unistd.h>
 
+static const char *const BarcodeSafariEarlyPaths[] = {
+    "/tmp/BarcodeSafari-early.log",
+    "/var/tmp/BarcodeSafari-early.log",
+    "/var/jb/tmp/BarcodeSafari-early.log",
+    "/var/mobile/Documents/BarcodeSafari-Debug.log",
+    "/var/jb/var/mobile/Documents/BarcodeSafari-Debug.log"
+};
+
 static void BarcodeSafariWriteEarlyLoad(void)
 {
-    const char *paths[] = {
-        "/tmp/BarcodeSafari-early.log",
-        "/var/mobile/Documents/BarcodeSafari-Debug.log"
-    };
-    const char *line = "[LOAD] C constructor executed\n";
-    for (size_t index = 0; index < sizeof(paths) / sizeof(paths[0]); index++) {
-        int descriptor = open(paths[index], O_WRONLY | O_CREAT | O_APPEND, 0644);
+    char executablePath[1024] = {0};
+    uint32_t pathSize = sizeof(executablePath);
+    int pathStatus = _NSGetExecutablePath(executablePath, &pathSize);
+    const char *resolvedPath = pathStatus == 0 ? executablePath : "<unresolved>";
+    char line[1400] = {0};
+    snprintf(line,
+             sizeof(line),
+             "[LOAD] C constructor executed pid=%d executable=%s\n",
+             getpid(),
+             resolvedPath);
+    for (size_t index = 0; index < sizeof(BarcodeSafariEarlyPaths) / sizeof(BarcodeSafariEarlyPaths[0]); index++) {
+        int descriptor = open(BarcodeSafariEarlyPaths[index], O_WRONLY | O_CREAT | O_APPEND, 0644);
         if (descriptor >= 0) {
             write(descriptor, line, strlen(line));
             close(descriptor);
@@ -28,26 +42,35 @@ static void BarcodeSafariEarlyConstructor(void)
     BarcodeSafariWriteEarlyLoad();
 }
 
-static NSString *const BarcodeSafariDebugPath = @"/var/mobile/Documents/BarcodeSafari-Debug.log";
+static NSString *const BarcodeSafariDebugPaths[] = {
+    @"/var/mobile/Documents/BarcodeSafari-Debug.log",
+    @"/var/jb/var/mobile/Documents/BarcodeSafari-Debug.log",
+    @"/var/jb/tmp/BarcodeSafari-Debug.log"
+};
 
 static void BarcodeSafariLog(NSString *tag, NSString *message)
 {
     NSString *timestamp = [[NSDate date] descriptionWithLocale:nil];
     NSString *line = [NSString stringWithFormat:@"%@ [%@] %@\n", timestamp, tag, message ?: @"<nil>"];
     NSData *data = [line dataUsingEncoding:NSUTF8StringEncoding];
-    NSString *directory = [BarcodeSafariDebugPath stringByDeletingLastPathComponent];
-    [[NSFileManager defaultManager] createDirectoryAtPath:directory
-                               withIntermediateDirectories:YES
-                                                attributes:nil
-                                                     error:nil];
-    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:BarcodeSafariDebugPath];
-    if (handle == nil) {
-        [[NSFileManager defaultManager] createFileAtPath:BarcodeSafariDebugPath contents:nil attributes:nil];
-        handle = [NSFileHandle fileHandleForWritingAtPath:BarcodeSafariDebugPath];
+    for (size_t index = 0; index < sizeof(BarcodeSafariDebugPaths) / sizeof(BarcodeSafariDebugPaths[0]); index++) {
+        NSString *debugPath = BarcodeSafariDebugPaths[index];
+        NSString *directory = [debugPath stringByDeletingLastPathComponent];
+        [[NSFileManager defaultManager] createDirectoryAtPath:directory
+                                   withIntermediateDirectories:YES
+                                                    attributes:nil
+                                                         error:nil];
+        NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:debugPath];
+        if (handle == nil) {
+            [[NSFileManager defaultManager] createFileAtPath:debugPath contents:nil attributes:nil];
+            handle = [NSFileHandle fileHandleForWritingAtPath:debugPath];
+        }
+        if (handle != nil) {
+            [handle seekToEndOfFile];
+            [handle writeData:data];
+            [handle closeFile];
+        }
     }
-    [handle seekToEndOfFile];
-    [handle writeData:data];
-    [handle closeFile];
     NSLog(@"[BarcodeSafari] %@", line);
 }
 
