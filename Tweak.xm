@@ -36,6 +36,8 @@ static BOOL BarcodeSafariContainsKeyword(NSString *value, NSArray<NSString *> *k
     return NO;
 }
 
+static void BarcodeSafariProbeRuntimeDetails(void);
+
 static void BarcodeSafariLogMethods(Class candidateClass, NSArray<NSString *> *methodKeywords)
 {
     NSMutableSet<NSString *> *seen = [NSMutableSet set];
@@ -43,7 +45,8 @@ static void BarcodeSafariLogMethods(Class candidateClass, NSArray<NSString *> *m
         NSString *className = NSStringFromClass(currentClass);
         unsigned int methodCount = 0;
         Method *methods = class_copyMethodList(currentClass, &methodCount);
-        for (unsigned int index = 0; index < methodCount; index++) {
+        NSUInteger loggedMethodCount = 0;
+        for (unsigned int index = 0; index < methodCount && loggedMethodCount < 40; index++) {
             SEL selector = method_getName(methods[index]);
             NSString *selectorName = NSStringFromSelector(selector);
             if ([seen containsObject:selectorName] || !BarcodeSafariContainsKeyword(selectorName, methodKeywords)) {
@@ -55,6 +58,7 @@ static void BarcodeSafariLogMethods(Class candidateClass, NSArray<NSString *> *m
                                                        className,
                                                        selectorName,
                                                        encoding ?: "<nil>"]);
+            loggedMethodCount++;
         }
         free(methods);
     }
@@ -72,15 +76,24 @@ static void BarcodeSafariProbeRuntime(void)
                                                      processInfo.processIdentifier,
                                                      executablePath]);
 
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        BarcodeSafariLog(@"LOAD", @"starting delayed runtime enumeration");
+        BarcodeSafariProbeRuntimeDetails();
+    });
+}
+
+static void BarcodeSafariProbeRuntimeDetails(void)
+{
     Class legacyClass = NSClassFromString(@"CCUIQRCodeScannerViewController");
     SEL legacySelector = sel_registerName("qrCodeScanner:didDecodeString:");
     BOOL legacySelectorExists = legacyClass != Nil && [legacyClass instancesRespondToSelector:legacySelector];
+
     BarcodeSafariLog(@"CLASS", [NSString stringWithFormat:@"CCUIQRCodeScannerViewController = %@",
                                                       legacyClass == Nil ? @"NO" : @"YES"]);
     BarcodeSafariLog(@"METHOD", [NSString stringWithFormat:@"qrCodeScanner:didDecodeString: = %@",
                                                        legacySelectorExists ? @"YES" : @"NO"]);
 
-    NSArray<NSString *> *classKeywords = @[@"Barcode", @"QRCode", @"QR", @"Scanner", @"Scan", @"Code", @"Payload", @"Result", @"Preview", @"URL", @"Web"];
+    NSArray<NSString *> *classKeywords = @[@"Barcode", @"QRCode", @"QR", @"Scanner", @"CodeScanner", @"Payload", @"Result", @"Preview", @"Web"];
     NSArray<NSString *> *methodKeywords = @[@"scan", @"code", @"decode", @"result", @"payload", @"URL", @"url", @"open", @"preview", @"web", @"request", @"present"];
     int classCount = objc_getClassList(NULL, 0);
     Class *classes = classCount > 0 ? (__unsafe_unretained Class *)calloc((size_t)classCount, sizeof(Class)) : NULL;
@@ -90,13 +103,15 @@ static void BarcodeSafariProbeRuntime(void)
     }
 
     objc_getClassList(classes, classCount);
-    for (int index = 0; index < classCount; index++) {
+    NSUInteger loggedClassCount = 0;
+    for (int index = 0; index < classCount && loggedClassCount < 100; index++) {
         NSString *className = NSStringFromClass(classes[index]);
         if (!BarcodeSafariContainsKeyword(className, classKeywords)) {
             continue;
         }
         BarcodeSafariLog(@"CLASS", className);
         BarcodeSafariLogMethods(classes[index], methodKeywords);
+        loggedClassCount++;
     }
     free(classes);
 }
